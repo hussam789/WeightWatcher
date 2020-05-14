@@ -20,10 +20,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 import powerlaw
         
-import tensorflow as tf
-from tensorflow import keras
-import keras
-from keras.models import load_model
 import pandas as pd
 from .RMT_Util import *
 #from RMT_Util import *
@@ -81,8 +77,6 @@ class WeightWatcher:
     def banner(self):
         versions  = "\npython      version {}".format(sys.version)
         versions += "\nnumpy       version {}".format(np.__version__)
-        versions += "\ntensforflow version {}".format(tf.__version__)
-        versions += "\nkeras       version {}".format(keras.__version__)
         return "\n{}{}".format(self.header(), versions)
 
 
@@ -203,12 +197,8 @@ class WeightWatcher:
         weights = []
         
         layers = []
-        if hasattr(model, 'layers'):
-            # keras
-            layers = model.layers
-        else:
-            # pyTorch
-            layers = model.modules()
+        # pyTorch
+        layers = model.modules()
             
         import torch.nn as nn
 
@@ -227,7 +217,7 @@ class WeightWatcher:
                 continue
 
             # DENSE layer (Keras) / LINEAR (pytorch)
-            if isinstance(l, keras.layers.core.Dense) or isinstance(l, nn.Linear):
+            if isinstance(l, nn.Linear):
 
                 res[i]["layer_type"] = LAYER_TYPE.DENSE
 
@@ -243,14 +233,6 @@ class WeightWatcher:
                     # pyTorch
                     weights = [np.array(l.weight.data.clone().cpu())]
                     receptive_field_size = l.weight.data[0][0].numel()
-                else:
-                    # keras
-                    weights = l.get_weights()[0:1] # keep only the weights and not the bias
-#                    weights = l.get_weights()[0:1]  #Keras default Glorot uniform
-                    
-                    # TODO: add option to append bias matrix
-                    #if add_bias:
-                    #    weights = weigths[0]+weights[1]
 
                 if weights[0].shape[1] < 2:
                     msg = "Skipping (Found array with 1 feature(s) while a minimum of 2 is required)"
@@ -277,27 +259,10 @@ class WeightWatcher:
                     self.debug("Layer {}: {}".format(i+1, msg))
                     res[i]["message"] = msg
                     continue
-            
-            elif (isinstance(l, keras.layers.convolutional.Conv1D)):                
-                res[i] = {"layer_type": LAYER_TYPE.CONV1D}
-
-                if (len(layer_types) > 0 and
-                        not any(layer_type & LAYER_TYPE.CONV1D for layer_type in layer_types)):
-                    msg = "Skipping (Layer type not requested to analyze)"
-                    self.debug("Layer {}: {}".format(i+1, msg))
-                    res[i]["message"] = msg
-                    continue
-                
-                weights = l.get_weights()[0:1] # keep only the weights and not the bias
-                
-                if weights[0].shape[1] < 2:
-                    msg = "Skipping (Found array with 1 feature(s) while a minimum of 2 is required)"
-                    self.debug("Layer {}: {}".format(i+1, msg))
-                    res[i]["message"] = msg
-                    continue
+          
                 
             # CONV2D layer
-            elif isinstance(l, keras.layers.convolutional.Conv2D) or isinstance(l, nn.Conv2d):
+            elif isinstance(l, nn.Conv2d):
 
                 res[i] = {"layer_type": LAYER_TYPE.CONV2D}
 
@@ -311,8 +276,7 @@ class WeightWatcher:
                 if isinstance(l, nn.Conv2d):
                     w = [np.array(l.weight.data.clone().cpu())]
                     receptive_field_size = l.weight.data[0][0].numel()
-                else:
-                    w = l.get_weights()
+                
                     
                 weights = self.get_conv2D_Wmats(w[0])
                 
